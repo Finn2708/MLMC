@@ -27,32 +27,33 @@ typedef struct
 {
   float a0x0;
   float a1x1;
-} MVS_t;
+} FFD_t;
 
-MVS_t mvs[3];
+FFD_t mvs[3];
 uint32_t ticksLastPID;
-int32_t curr_enc;
-int32_t last_enc;
+int32_t currentEncoderPos;
+int32_t lastEncoderPos;
 float getRPM = 0.;
 float setRPM;
 float getPWM;
 float getPIDVal;
-float lpf_factor=.1;
-float rpm_lpf;
-float pwm_lpf;
+float lpfFactor=.1;
+float lpfRPM;
+float lpfPWM;
+
 volatile uint32_t ticksMostSig;
 
-int32_t EncoderPos;
-int8_t mvsBalance0;
-int8_t mvsBalance1;
+int32_t encoderPos;
+int8_t ffdBalance0;
+int8_t ffdBalance1;
 
 volatile uint8_t cache, cacheOld;
 
-PID_t PID = {0.100,
+PID_t pid = {0.100,
              5.000,
              0.000};
 
-static PIDController pidCon = PIDController(PID.P, PID.I, PID.D, 127, -127);
+static PIDController pidCtr = PIDController(pid.P, pid.I, pid.D, 127, -127);
 
 
 // Subscriber Callback
@@ -88,7 +89,7 @@ void loop() {
 void controllerSetup()
 {
   /* SETUP */
-  pidCon.resetController();
+  pidCtr.resetController();
 
   /// Pin - setup: PC 0-3 to input (PCINT8 - 11)
   DDRC &= 0b11110011; // 0 => input / 1 => leave state
@@ -130,23 +131,23 @@ void controllerLoop()
         ticksLastPID = ticks;
 
         // calc vals
-        curr_enc = EncoderPos;
-        int16_t d_enc = (curr_enc - last_enc);
-        last_enc = curr_enc;
+        currentEncoderPos = encoderPos;
+        int16_t d_enc = (currentEncoderPos - lastEncoderPos);
+        lastEncoderPos = currentEncoderPos;
 
         getRPM = ((float)d_enc) / dt;
 
         // calc lpf-vals
-        rpm_lpf += (getRPM - rpm_lpf) * lpf_factor;
-        pwm_lpf += (getPWM - pwm_lpf) * lpf_factor;
+        lpfRPM += (getRPM - lpfRPM) * lpfFactor;
+        lpfPWM += (getPWM - lpfPWM) * lpfFactor;
 
-        encMsg.data = rpm_lpf;
+        encMsg.data = lpfRPM;
         pub.publish(&encMsg);
 
-        float pidVal = pidCon.runController(rpm_lpf, setRPM, dt);
-        float pwm = pidVal; // + vorsteuerung(setRPM, mvsBalance0, mvsBalance1);
+        float pidVal = pidCtr.runController(lpfRPM, setRPM, dt);
+        float pwm = pidVal; // + vorsteuerung(setRPM, ffdBalance0, ffdBalance1);
 
-        getPIDVal += (pidVal - getPIDVal) * lpf_factor;  //debug
+        getPIDVal += (pidVal - getPIDVal) * lpfFactor;  //debug
 
         if (setRPM * pwm < 0)
         {
@@ -170,12 +171,12 @@ void controllerLoop()
         Serial.print("PWM:");
         Serial.print(getPWM, 0);
         Serial.print("\t");
-        //Serial.print(pwm_lpf, 0);
+        //Serial.print(lpfPWM, 0);
         //Serial.print("\t");
         Serial.print("RPM:");
         Serial.print(setRPM, 0);
         Serial.print("\t");
-        //Serial.print(rpm_lpf, 0);
+        //Serial.print(lpfRPM, 0);
         //Serial.print("\t");
 
         Serial.println();
@@ -213,11 +214,11 @@ ISR(PCINT1_vect)
     //    >=1 && >=1 = 1      1 & 1 = 1
     if ((x1 & 0b00000001) && !(x2 & 0b00000001))
     {
-    EncoderPos--;
+    encoderPos--;
     }
     if (!(x1 & 0b00000001) && (x2 & 0b00000001))
     {
-    EncoderPos++;
+    encoderPos++;
     }
     */
 
@@ -225,17 +226,17 @@ ISR(PCINT1_vect)
     // ENCODER B (PC2 and PC3)
     if ((x1 & 0b00000100) && !(x2 & 0b00000100))
     {
-        EncoderPos++;
+        encoderPos++;
     }
     if (!(x1 & 0b00000100) && (x2 & 0b00000100))
     {
-        EncoderPos--;
+        encoderPos--;
     }
     cacheOld = cache;
 }
 
 // Functions
-float vorsteuerung(float tarRPM, uint8_t mvsBalance0, uint8_t mvsBalance1)
+float vorsteuerung(float tarRPM, uint8_t ffdBalance0, uint8_t ffdBalance1)
 {
   float ret[3];
   float absTarRPM = abs(tarRPM);
@@ -251,8 +252,8 @@ float vorsteuerung(float tarRPM, uint8_t mvsBalance0, uint8_t mvsBalance1)
       ret[i] = 0;
     }
   }
-  float divider0 = (float)mvsBalance0 / 255;
-  float divider1 = (float)mvsBalance1 / 255;
+  float divider0 = (float)ffdBalance0 / 255;
+  float divider1 = (float)ffdBalance1 / 255;
 
   float out = divider0 * ret[0];                   // VSx
   out += (1 - divider0) * divider1 * ret[1];       // VSy
