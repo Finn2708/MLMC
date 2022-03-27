@@ -2,6 +2,7 @@
 #include <ros.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float32.h>
+#include <mlmc_msgs/PID.h>
 
 #include <PIDController.h>
 
@@ -13,9 +14,9 @@ ros::NodeHandle nh;
 
 // Message definition
 std_msgs::Float32 encMsg;
+mlmc_msgs::PID pidMsg;
 
 // Variables
-// const uint8_t cpu_freq = 20; //MHz
 
 typedef struct
 {
@@ -45,7 +46,7 @@ float lpfPWM;
 volatile uint32_t ticksMostSig;
 
 int32_t encoderPos;
-int8_t ffdBalance0;
+int8_t ffdBalance0 = 0;
 int8_t ffdBalance1;
 
 volatile uint8_t cache, cacheOld;
@@ -57,18 +58,27 @@ PID_t pid = {0.100,
 static PIDController pidCtr = PIDController(pid.P, pid.I, pid.D, 127, -127);
 
 
-// Subscriber Callback
+// Subscriber Callbacks
 void setSpeedCB(const std_msgs::Float32& msg)
 {
     setRPM = msg.data;
 }
 
+
+void setPIDCB(const mlmc_msgs::PID& msg)
+{
+    pidCtr.tuneGains(msg.p, msg.i, msg.d, 127, -127);
+    ffdBalance0 = msg.ffd0;
+    ffdBalance1 = msg.ffd1;
+}
+
+
 // Publisher 
 ros::Publisher pub("encoderSpeed", &encMsg);
 
-// Subscriber
+// Subscribers
 ros::Subscriber<std_msgs::Float32> sub("setSpeed", setSpeedCB);
-
+ros::Subscriber<mlmc_msgs::PID> pidSub("setPID", setPIDCB);
 
 // Functions
 float ffdControl(float tarRPM, uint8_t ffdBalance0, uint8_t ffdBalance1)
@@ -286,7 +296,9 @@ void setup() {
     controllerSetup();
     nh.getHardware()->setBaud(93600);
     nh.initNode();
+
     nh.subscribe(sub);
+    nh.subscribe(pidSub);
     nh.advertise(pub);
 }
 
