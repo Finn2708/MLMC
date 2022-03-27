@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <ros.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float32.h>
@@ -68,64 +69,102 @@ ros::Publisher pub("encoderSpeed", &encMsg);
 // Subscriber
 ros::Subscriber<std_msgs::Float32> sub("setSpeed", setSpeedCB);
 
-void setup() {
-    controllerSetup();
-    nh.getHardware()->setBaud(93600);
-    nh.initNode();
-    nh.subscribe(sub);
-    nh.advertise(pub);
+
+// Functions
+float ffdControl(float tarRPM, uint8_t ffdBalance0, uint8_t ffdBalance1)
+{
+  float ret[3];
+  float absTarRPM = abs(tarRPM);
+  for (int i = 0; i < 3; ++i)
+  {
+    ret[i] = mvs[i].a0x0 + (absTarRPM * mvs[i].a1x1);
+    if (tarRPM < 0)
+    {
+      ret[i] *= -1;
+    }
+    if (tarRPM == 0)
+    {
+      ret[i] = 0;
+    }
+  }
+  float divider0 = (float)ffdBalance0 / 255;
+  float divider1 = (float)ffdBalance1 / 255;
+
+  float out = divider0 * ret[0];                   // VSx
+  out += (1 - divider0) * divider1 * ret[1];       // VSy
+  out += (1 - divider0) * (1 - divider1) * ret[2]; // VSyaw
+  return out;
 }
 
-void loop() {
-    // Motor Control Stuff here:
-    controllerLoop();
 
-    // Publisher stuff here:
-
-    // Handle the ROS stuff
-    nh.spinOnce();
+void setMotor(float speed, uint8_t motor)
+{
+  uint16_t speed_int = abs(speed);
+  if (motor == 0)
+  {
+    if ((speed >= 0))
+    {
+      OCR0B = (uint8_t)0;
+      OCR0A = (uint8_t)speed_int;
+    }
+    else
+    {
+      OCR0B = (uint8_t)speed_int;
+      OCR0A = (uint8_t)0;
+    }
+  }
+  else
+  {
+    if ((speed >= 0))
+    {
+      OCR2B = (uint8_t)0;
+      OCR2A = (uint8_t)speed_int;
+    }
+    else
+    {
+      OCR2B = (uint8_t)speed_int;
+      OCR2A = (uint8_t)0;
+    }
+  }
 }
+
 
 void controllerSetup()
 {
-  /* SETUP */
+  // SETUP
   pidCtr.resetController();
 
-  /// Pin - setup: PC 0-3 to input (PCINT8 - 11)
-  DDRC &= 0b11110011; // 0 => input / 1 => leave state
+  // Pin - setup: PC 0-3 to input (PCINT8 - 11)
+  DDRC &= 0b11110011;       // 0 => input / 1 => leave state
 
-  /// Pin - setup: PD3, PD5, PD6, PB3 as output
+  // Pin - setup: PD3, PD5, PD6, PB3 as output
   DDRD |= 0b01101001;
   DDRB |= 0b00001000;
 
-  /// Timer0 / 2 [PWM-Setup]
-  TCCR0A = TCCR2A = 0xF3; // Fast-PWM (inverting mode)
-/*
-  TCCR0B = TCCR2B = 0x01; // start Timer prescaler clk/1 => F_CPU/255
-*/
+  // Timer0 / 2 [PWM-Setup]
+  TCCR0A = TCCR2A = 0xF3;   // Fast-PWM (inverting mode)
+
   OCR0A = OCR0B = OCR2A = OCR2B = 0;
-  /// EXTERNAL INTERUPT
+
+  // EXTERNAL INTERUPT
   PCICR |= (1 << PCIE1);    // Enable Pin Change Interrupt
   PCMSK1 = 0b00001100;      // Enable Pins PCINT8...PCINT11 (PC0...PC3) for Pin Change Interrupts
-  /// Timer1 [Clock-Setup]
+
+  // Timer1 [Clock-Setup]
   OCR1A = 0xFFFF;           // Set Output Compare Register A of Timer 1 to 0xFFFF = 65536 = 16 bit
   TCCR1B = (1 << WGM12);    // Mode 4: Clear Timer on Compare Match (CTC): if(TCNT1==OCR1A){TCNT=0;}
   TIMSK1 |= (1 << OCIE1A);  // Enable Interrupt on Output Compare Match 
   TCCR1B |= (1 << CS10);    // Set Prescaler to 1 and start the timer 
-/*
-                            // [original comment: set prescaler to 8 and start the timer (OSC)]
-  /* END SETUP */
-  //wdt_enable(WDTO_500MS);
-  // wdt_enable(WDTO_15MS);    // Enable Watch Dog Timer with Time Out = 15 ms
+
   sei();                    // Enable Interrupts
 }
 
+
 void controllerLoop()
 {
-    // wdt_reset(); // Reset Watchdog Timer
     uint16_t ticks = micros(); // Read current value of TCNT1 
     uint16_t dtTick = ticks - ticksLastPID;
-    if (dtTick >= 4000) // ~0.001s => 1kHz control-loop  ///TODO: overflow?!?!?!?
+    if (dtTick >= 1415) // 700 Hz control-loop
     {
         float dt = (dtTick) / (1000000.0f);
         ticksLastPID = ticks;
@@ -145,7 +184,7 @@ void controllerLoop()
         pub.publish(&encMsg);
 
         float pidVal = pidCtr.runController(lpfRPM, setRPM, dt);
-        float pwm = pidVal; // + vorsteuerung(setRPM, ffdBalance0, ffdBalance1);
+        float pwm = pidVal + ffdControl(setRPM, ffdBalance0, ffdBalance1);
 
         getPIDVal += (pidVal - getPIDVal) * lpfFactor;  //debug
 
@@ -191,6 +230,7 @@ ISR(TIMER1_COMPA_vect)
   ticksMostSig++;
 }
 
+
 ISR(PCINT1_vect)
 {
     cache = PINC; // Save Pin states of Pin PC0...PC6 to cache
@@ -235,64 +275,28 @@ ISR(PCINT1_vect)
     cacheOld = cache;
 }
 
-// Functions
-float vorsteuerung(float tarRPM, uint8_t ffdBalance0, uint8_t ffdBalance1)
-{
-  float ret[3];
-  float absTarRPM = abs(tarRPM);
-  for (int i = 0; i < 3; ++i)
-  {
-    ret[i] = mvs[i].a0x0 + (absTarRPM * mvs[i].a1x1);
-    if (tarRPM < 0)
-    {
-      ret[i] *= -1;
-    }
-    if (tarRPM == 0)
-    {
-      ret[i] = 0;
-    }
-  }
-  float divider0 = (float)ffdBalance0 / 255;
-  float divider1 = (float)ffdBalance1 / 255;
-
-  float out = divider0 * ret[0];                   // VSx
-  out += (1 - divider0) * divider1 * ret[1];       // VSy
-  out += (1 - divider0) * (1 - divider1) * ret[2]; // VSyaw
-  return out;
-}
 
 inline uint16_t getTicks(void)
 {
   return TCNT1;
 }
 
-void setMotor(float speed, uint8_t motor)
-{
-  uint16_t speed_int = abs(speed);
-  if (motor == 0)
-  {
-    if ((speed >= 0))
-    {
-      OCR0B = (uint8_t)0;
-      OCR0A = (uint8_t)speed_int;
-    }
-    else
-    {
-      OCR0B = (uint8_t)speed_int;
-      OCR0A = (uint8_t)0;
-    }
-  }
-  else
-  {
-    if ((speed >= 0))
-    {
-      OCR2B = (uint8_t)0;
-      OCR2A = (uint8_t)speed_int;
-    }
-    else
-    {
-      OCR2B = (uint8_t)speed_int;
-      OCR2A = (uint8_t)0;
-    }
-  }
+
+void setup() {
+    controllerSetup();
+    nh.getHardware()->setBaud(93600);
+    nh.initNode();
+    nh.subscribe(sub);
+    nh.advertise(pub);
+}
+
+
+void loop() {
+    // Motor Control Stuff here:
+    controllerLoop();
+
+    // Publisher stuff here:
+
+    // Handle the ROS stuff
+    nh.spinOnce();
 }
