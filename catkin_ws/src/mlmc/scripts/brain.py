@@ -1,7 +1,8 @@
-from dataclasses import dataclass, field
 import rospy
+import pandas as pd
 import matplotlib.pyplot as plt
 
+from dataclasses import dataclass, field
 from std_msgs.msg import Float32
 from std_srvs.srv import Trigger
 from mlmc_msgs.msg import PID
@@ -15,6 +16,22 @@ class PIDContainer:
     d: float = field(init=True, repr=True, default=0.0)
     ffd0: float = field(init=True, repr=True, default=0.0)
     ffd1: float = field(init=True, repr=True, default=0.0)
+
+
+def find_closest_idx(value, ts):
+    pass
+
+
+def mean_square_error(target: pd.Series, actual: pd.Series):
+    mse = 0
+    for tar_idx, tar_data in zip(target.index, target):
+        # Find the next matching index in actual
+        act_idx_above = actual.index.get_indexer([tar_idx], method="bfill")[0]
+        act_data = actual.iloc[act_idx_above]
+
+        # Calculate mean squared error sum
+        mse += (tar_data - act_data)**2
+    return mse / target.size
 
 
 def main():
@@ -64,15 +81,15 @@ def main():
         sub_set_speed.unregister()
         sub_enc_speed.unregister()
 
-        set_x = [t[0] - set_speeds[0][0] for t in set_speeds]
-        set_y = [t[1] for t in set_speeds]
+        # Create time series
+        ts_set = pd.Series(data=[t[1] for t in set_speeds], index=[t[0] - set_speeds[0][0] for t in set_speeds])
+        ts_enc = pd.Series(data=[t[1] for t in enc_speeds], index=[t[0] - set_speeds[0][0] for t in enc_speeds])
+        
+        mse = mean_square_error(ts_set, ts_enc)
 
-        enc_x = [t[0] - enc_speeds[0][0] for t in enc_speeds]
-        enc_y = [t[1] for t in enc_speeds]
-
-
-        plt.plot(enc_x, enc_y)
-        plt.plot(set_x, set_y)
+        # Show the data
+        ts_enc.plot()
+        ts_set.plot()
         plt.title(f"P={pid.p} I={pid.i} D={pid.d}\nFFD0={pid.ffd0} FFD1={pid.ffd1}")
         plt.xlabel("Time [s]")
         plt.ylabel("Motor speed [Encoderticks / s]")
