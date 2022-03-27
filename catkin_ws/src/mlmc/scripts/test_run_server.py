@@ -47,14 +47,12 @@ def chirp_wave_gen(runtime: float=30., period: float=8, max_speed: float=2000., 
 
 def handle_trigger(request: TriggerRequest) -> TriggerResponse:
 
-    print(" Test run triggered!")
-
     pub = rospy.Publisher("setSpeed", Float32, queue_size=10)
     msg = Float32()
 
-    r = rospy.Rate(312)
+    r = rospy.Rate(700)
 
-    for speed in chirp_wave_gen():
+    for speed in square_wave_gen(runtime=5.0, period=6.0):
         msg.data = speed
         pub.publish(msg)
         r.sleep()
