@@ -50,11 +50,11 @@ def handle_trigger(request: TriggerRequest) -> TriggerResponse:
     pub = rospy.Publisher("setSpeed", Float32, queue_size=10)
     msg = Float32()
 
+    pub.publish(data=0.0)
     r = rospy.Rate(700)
 
     for speed in square_wave_gen(runtime=5.0, period=6.0):
-        msg.data = speed
-        pub.publish(msg)
+        pub.publish(data=speed)
         r.sleep()
     
     return TriggerResponse(True, "Test done")
