@@ -62,10 +62,7 @@ def handle_trigger(request: TriggerRequest) -> TriggerResponse:
 
 def test_run_server():
     rospy.init_node("test_run_server")
-
     s = rospy.Service("test_run_trigger", Trigger, handle_trigger)
-
-    print("Ready to run tests...")
     rospy.spin()
 
 
