@@ -18,5 +18,12 @@
         pkg="mlmc"
         type="brain.py"
     />
-    
+
+    <node
+        name="mlmc_plot"
+        pkg="rqt_plot"
+        type="rqt_plot"
+        args="-e /setSpeed /encoderSpeed"
+    />
+
 </launch>
