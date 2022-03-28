@@ -1,6 +1,5 @@
 import rospy
 import random
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -8,6 +7,7 @@ from std_msgs.msg import Float32
 from std_srvs.srv import Trigger
 from mlmc_msgs.msg import PID
 from deap import base, creator, tools
+from typing import Tuple, List
 
 
 # Setup the ROS PID publisher
@@ -31,7 +31,7 @@ def squared_error(target: pd.Series, actual: pd.Series) -> pd.Series:
     return pd.Series(data=err_data, index=time_stamp)
 
 
-def evaluateIndividual(individual) -> float:
+def evaluateIndividual(individual: List[float, float, float, float, float]) -> Tuple[float,]:
     # Define subscriber callbacks
     def set_speed_cb(msg: Float32) -> None:
         set_speeds.append((rospy.get_time(), msg.data))
@@ -71,6 +71,9 @@ def evaluateIndividual(individual) -> float:
                     d=0., 
                     ffd0=0., 
                     ffd1=0.)
+
+    # And wait for the motor to recover from (possibly) terrible PIDs
+    rospy.sleep(.5)
 
     # Create time series
     ts_set = pd.Series(data=[t[1] for t in set_speeds], index=[t[0] - set_speeds[0][0] for t in set_speeds])
