@@ -58,8 +58,13 @@ def evaluate_individual(individual: List[float]) -> Tuple[float,]:
     set_speeds = [(rospy.get_time(), 0.0)]
     enc_speeds = [(rospy.get_time(), 0.0)]
 
-    # Trigger a test run
-    test_run_trigger()
+    try:
+        # Trigger a test run
+        test_run_trigger()
+    except rospy.ServiceException as e:
+        rospy.logwarn(f"Service call failure: {e}")
+        return (300000,)
+
 
     # Unregister subscribers
     sub_set_speed.unregister()
@@ -134,7 +139,7 @@ def main():
     gen = 0
 
     while not rospy.is_shutdown():
-        while max(fits) > -10000 and gen < 20:
+        while max(fits) > 10000 and gen < 20:
             gen += 1
             print(f"-- Generation {gen} --")
 
