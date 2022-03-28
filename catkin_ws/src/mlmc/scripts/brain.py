@@ -31,7 +31,7 @@ def squared_error(target: pd.Series, actual: pd.Series) -> pd.Series:
     return pd.Series(data=err_data, index=time_stamp)
 
 
-def evaluateIndividual(individual: List[float, float, float, float, float]) -> Tuple[float,]:
+def evaluate_individual(individual: List[float]) -> Tuple[float,]:
     # Define subscriber callbacks
     def set_speed_cb(msg: Float32) -> None:
         set_speeds.append((rospy.get_time(), msg.data))
@@ -90,7 +90,7 @@ def setup_ga() -> base.Toolbox:
 
     toolbox = base.Toolbox()
     # Initial genes are generated randomly
-    toolbox.register("attr_float", random.uniform,  0., 1.)
+    toolbox.register("attr_float", random.uniform,  0., 5.)
     # Each individual should have 5 attr_floats
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_float, 5)
     # Population should be a number of individuals
@@ -98,7 +98,7 @@ def setup_ga() -> base.Toolbox:
 
 
     # Evaluate
-    toolbox.register("evaluate", evaluateIndividual)
+    toolbox.register("evaluate", evaluate_individual)
     # Crossover
     toolbox.register("mate", tools.cxTwoPoint)
     # Mutation (rate=0.05)
