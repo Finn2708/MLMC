@@ -17,6 +17,7 @@
         name="brain"
         pkg="mlmc"
         type="brain.py"
+        output="screen"
     />
 
     <node
