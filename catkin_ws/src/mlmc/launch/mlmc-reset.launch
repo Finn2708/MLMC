@@ -1,0 +1,23 @@
+<launch>
+
+    <node 
+        name="rosserial_node" 
+        pkg="rosserial_python" 
+        type="serial_node.py"
+        args="_baud:=93600"
+    />
+
+    <node 
+        name="test_run_server"
+        pkg="mlmc"
+        type="test_run_server.py"
+    />
+
+    <node
+        name="mlmc_plot"
+        pkg="rqt_plot"
+        type="rqt_plot"
+        args="-e /setSpeed /encoderSpeed"
+    />
+
+</launch>
