@@ -27,11 +27,11 @@ typedef struct
 
 typedef struct
 {
-  float a0x0;
-  float a1x1;
+  float a0;
+  float a1;
 } FFD_t;
 
-FFD_t mvs[3];
+FFD_t ffd[3] = {{0}, {0}, {0}};
 uint32_t ticksLastPID;
 int32_t currentEncoderPos;
 int32_t lastEncoderPos;
@@ -87,7 +87,7 @@ float ffdControl(float tarRPM, uint8_t ffdBalance0, uint8_t ffdBalance1)
   float absTarRPM = abs(tarRPM);
   for (int i = 0; i < 3; ++i)
   {
-    ret[i] = mvs[i].a0x0 + (absTarRPM * mvs[i].a1x1);
+    ret[i] = ffd[i].a0 + (absTarRPM * ffd[i].a1);
     if (tarRPM < 0)
     {
       ret[i] *= -1;
