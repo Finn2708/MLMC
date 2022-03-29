@@ -9,6 +9,7 @@
 ## Abstract
 [ROS](https://www.ros.org/)-based project for automatically optimizing PID settings of a motorcontroller with genetic algorithms using the [DEAP](https://github.com/DEAP/deap) framework. Communication with motor controller is implemented via [rosserial](https://github.com/ros-drivers/rosserial). 
 
+Please note:
 > PIDs can be tuned easier, faster and safer in software. This repo is for educational purposes only.
 
 ## Hardware
@@ -19,7 +20,10 @@
 
 The PID controller is translated into a genetic representation as a list object containing P-, I-, D- and several custom feed-forward control parameters. Using the [DEAP](https://github.com/DEAP/deap) framework, a population of individuals with randomly chosen parameters is created. 
 
-The fitness of each individual is determined by the function `evaluate_individual`. After publishing the individuals PID parameters via the ROS network as a custom message, it triggers a physical test run using a [ROS service](http://docs.ros.org/en/api/std_srvs/html/srv/Trigger.html). The `test_run_server.py` offers three waveform generators that may be used to generate many different trajectories. By default, a squarewave is generated to evaluate a step response. It is continuously broadcast to the ROS network as `setSpeed`. A ROS serial node sends the message via UART to the controller. The controller reads the input signal, actuates the motor and evaluates the encoder feedback. It returns the calculated `encoderSpeed` to the ROS serial node that publishes it to the network. The function `evaluate_individual` reads `setSpeed` and `encoderSpeed` from the ROS network and calculates the mean squared error over the duration of a test run to determine the fitness of the individual. Once the test run is completed, known-good PID parameters are send to the controller so the motor can stabilize before the next test run.
+The fitness of each individual is determined by the function `evaluate_individual`. After publishing the individuals PID parameters via the ROS network as a custom message, it triggers a physical test run using a [ROS service](http://docs.ros.org/en/api/std_srvs/html/srv/Trigger.html). The `test_run_server.py` offers three waveform generators that may be used to generate many different trajectories. By default, a squarewave is generated to evaluate a step response. It is continuously broadcast to the ROS network as `setSpeed`. A ROS serial node sends the message via UART to the controller. The controller reads the input signal, actuates the motor and evaluates the encoder feedback. It returns the calculated `encoderSpeed` to the ROS serial node that publishes it to the network. The ROS graph is shown below (service not shown):
+![ROS Graph](media/rosgraph.png)
+
+The function `evaluate_individual` reads `setSpeed` and `encoderSpeed` from the ROS network and calculates the mean squared error over the duration of a test run to determine the fitness of the individual. Once the test run is completed, known-good PID parameters are send to the controller so the motor can stabilize before the next test run.
 
 A sequence diagram of the `evaluate_individual` function is shown below:
 
@@ -51,6 +55,7 @@ sequenceDiagram
 
 After each individual has a fitness value attached, a new generation is created using mutation and cross-over. The new generation is again evaluated until a fitness threshold is passed or until a predefined number of generations is reached.
 
+
 ### Setup
 ```
 git clone git@github.com:Finn2708/MLMC.git
@@ -80,10 +85,23 @@ Training will start immediately with params defined in `brain.py`. A preconfigur
 
 
 ## Results
+### Baseline Controller
+The following image shows the controller in a manually tuned state. It serves as a baseline reading to compare the genetically optimized controllers against. The diagram shows clear overshoot, but `encoderSpeed` is fairly precise and stable once `setSpeed` is reached
+
+The parameter of the baseline controller are:
+- P = 0.1
+- I = 5.0
+- D = 0.0
+![](media/Baseline.png)
 
 ### Mean Squared Error
 
-The diagram below shows result for a population size of 100 and ten generations. After only two generations, an individual close to the all-time champion was found. After 9 generations, the average result stops improving.
+The diagram below shows results for a mean squared error fitness function (lower is better). A population size of 100 was chosen and the algorithm ran for 10 generations. After only two generations, an individual close to the all-time champion was found. After 9 generations, the average result stops improving.
+
+Best individual is:
+- P = 4.721105261913877
+- I = 3.9555457895369717
+- D = 0.04280607386434654
 
 Overall, it is evident that mean squared error (MSE) is not ideal to tune the controller because of the high frequency noise induced.
 
