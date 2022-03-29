@@ -1,4 +1,11 @@
 # MLMC
+
+## Table of contents
+1. [Abstract](#abstract)
+2. [Hardware](#hardware)
+3. [Software](#software)
+5. [Results](#results)
+
 ## Abstract
 [ROS](https://www.ros.org/)-based project for automatically optimizing PID settings of a motorcontroller with genetic algorithms using the [DEAP](https://github.com/DEAP/deap) framework. Communication with motor controller is implemented via [rosserial](https://github.com/ros-drivers/rosserial). 
 
@@ -59,7 +66,7 @@ cd MLMC/PIO/lib
 rosrun rosserial_arduino make_libraries . mlmc_msgs
 ```
 
-## Usage
+### Usage
 To launch the entire project, run:
 
 ```
@@ -70,3 +77,14 @@ roslaunch mlmc mlmc.launch
 ```
 
 Training will start immediately with params defined in `brain.py`. A preconfigured `rqt_plot` window will show current and set speeds of the motor.
+
+
+## Results
+
+### Mean Squared Error
+
+The diagram below shows result for a population size of 100 and ten generations. After only two generations, an individual close to the all-time champion was found. After 9 generations, the average result stops improving.
+
+Overall, it is evident that mean squared error (MSE) is not ideal to tune the controller because of the high frequency noise induced.
+
+![](media/MSE-POP_SIZE%3D100-GEN_MAX%3D10.png)
