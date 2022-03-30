@@ -5,6 +5,7 @@
 2. [Hardware](#hardware)
 3. [Software](#software)
 5. [Results](#results)
+6. [Outlook](#outlook)
 
 ## Abstract
 [ROS](https://www.ros.org/)-based project for automatically optimizing PID settings of a motorcontroller with genetic algorithms using the [DEAP](https://github.com/DEAP/deap) framework. Communication with motor controller is implemented via [rosserial](https://github.com/ros-drivers/rosserial). 
@@ -94,6 +95,7 @@ The parameter of the baseline controller are:
 - D = 0.0
 ![](media/Baseline.png)
 
+
 ### Mean Squared Error
 
 The diagram below shows results for a mean squared error fitness function (lower is better). A population size of 100 was chosen and the algorithm ran for 10 generations. After only two generations, an individual close to the all-time champion was found. After 9 generations, the average result stops improving.
@@ -106,3 +108,20 @@ Best individual is:
 Overall, it is evident that mean squared error (MSE) is not ideal to tune the controller because of the high frequency noise induced.
 
 ![](media/MSE-POP_SIZE%3D100-GEN_MAX%3D10.png)
+
+
+### Error Sum
+The diagram below shows the result with an evaluation function that sums up the absolute error.
+
+PID parameters:
+- P = 0.8878890486736224
+- I = 7.911091579073943
+- D = 0.0
+
+![](media/ERR_SUM-POP_SIZE%3D100-GEN_MAX%3D10.png)
+
+
+### Outlook
+The project can be improved upon by:
+- Finding an evaluation function that takes high frequencies into account more
+- Multi-Objective Optimization of, e.g., total error sum, step response and highest frequency
