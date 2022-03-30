@@ -93,6 +93,7 @@ The parameter of the baseline controller are:
 - P = 0.1
 - I = 5.0
 - D = 0.0
+
 ![](media/Baseline.png)
 
 
